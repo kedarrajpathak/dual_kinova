@@ -84,13 +84,8 @@ class ActionsCfg:
     """Action specifications for the MDP."""
 
         # Set actions for the specific robot type (franka)
-    left_arm = DifferentialInverseKinematicsActionCfg(
-        asset_name="robot",
-        joint_names=["left_joint_.*"],
-        body_name="left_end_effector_link",
-        controller=DifferentialIKControllerCfg(command_type="pose", use_relative_mode=False, ik_method="dls"),
-        scale=0.5,
-        body_offset=DifferentialInverseKinematicsActionCfg.OffsetCfg(pos=(0.0, 0.0, 0.15)),
+    left_arm = mdp.JointPositionActionCfg(
+        asset_name="robot", joint_names=["left_joint_.*"], scale=0.5, use_default_offset=True
     )
     left_gripper = mdp.BinaryJointPositionActionCfg(
             asset_name="robot",
@@ -98,13 +93,8 @@ class ActionsCfg:
             open_command_expr={"left_robotiq_85_left_knuckle_joint": 0.78},
             close_command_expr={"left_robotiq_85_left_knuckle_joint": 0.0},
         )
-    right_arm = DifferentialInverseKinematicsActionCfg(
-        asset_name="robot",
-        joint_names=["right_joint_.*"],
-        body_name="right_end_effector_link",
-        controller=DifferentialIKControllerCfg(command_type="pose", use_relative_mode=False, ik_method="dls"),
-        scale=0.5,
-        body_offset=DifferentialInverseKinematicsActionCfg.OffsetCfg(pos=(0.0, 0.0, 0.15)),
+    right_arm = mdp.JointPositionActionCfg(
+        asset_name="robot", joint_names=["right_joint_.*"], scale=0.5, use_default_offset=True
     )
     right_gripper = mdp.BinaryJointPositionActionCfg(
             asset_name="robot",
@@ -221,7 +211,7 @@ class TerminationsCfg:
 
 
 @configclass
-class DualKinovaRLEnvCfg(ManagerBasedRLEnvCfg):
+class DualKinovaJointPosRLEnvCfg(ManagerBasedRLEnvCfg):
     # Scene settings
     scene: DualKinovaSceneCfg = DualKinovaSceneCfg(num_envs=4096, env_spacing=4.0)
     # Basic settings
