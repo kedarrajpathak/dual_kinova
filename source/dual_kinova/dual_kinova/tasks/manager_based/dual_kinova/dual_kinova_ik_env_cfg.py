@@ -10,6 +10,8 @@ import math
 
 import isaaclab.sim as sim_utils
 import isaaclab.utils.math as math_utils
+from isaaclab.actuators import ImplicitActuatorCfg
+from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg, RigidObject
 from isaaclab.sensors import Camera, CameraCfg, RayCasterCamera, TiledCameraCfg, TiledCamera
 from isaaclab.controllers.differential_ik_cfg import DifferentialIKControllerCfg
@@ -30,7 +32,64 @@ from isaaclab_tasks.manager_based.manipulation.lift import mdp
 # Pre-defined configs
 ##
 
-from isaaclab_assets.robots.kinova import DUAL_KINOVA_CFG  # isort:skip
+DUAL_KINOVA_CFG = ArticulationCfg(
+    spawn=sim_utils.UsdFileCfg(
+        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/manipulation/dual_kinova/USD/dual_kinova_imitation.usd",
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            disable_gravity=False,
+            max_depenetration_velocity=5.0,
+        ),
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+            enabled_self_collisions=True, solver_position_iteration_count=8, solver_velocity_iteration_count=0
+        ),
+        activate_contact_sensors=False,
+    ),
+    init_state=ArticulationCfg.InitialStateCfg(
+        joint_pos={
+            "right_joint_1": 0.0,
+            "right_joint_2": 0.65,
+            "right_joint_3": 0.0,
+            "right_joint_4": 1.89,
+            "right_joint_5": 0.0,
+            "right_joint_6": 0.6,
+            "right_joint_7": -1.57,
+            "right_robotiq_85_left_knuckle_joint": 0.0,
+            "left_joint_1": 0.0,
+            "left_joint_2": 0.65,
+            "left_joint_3": 0.0,
+            "left_joint_4": 1.89,
+            "left_joint_5": 0.0,
+            "left_joint_6": 0.6,
+            "left_joint_7": -1.57,
+            "left_robotiq_85_left_knuckle_joint": 0.0,
+        },
+    ),
+    actuators={
+        "arm": ImplicitActuatorCfg(
+            joint_names_expr=[".*"],
+            velocity_limit={100.0},
+            effort_limit={".*joint_[1-4]": 2340.0,
+                          ".*joint_[5-7]": 540.0,
+                          ".*robotiq_85_left_knuckle_joint": 16.5,
+                          ".*robotiq_85_right_finger_tip_joint": 0.5,
+                          ".*robotiq_85_left_finger_tip_joint": 0.5,
+                         },
+            stiffness={
+                ".*joint_[1-7]": 1000.0,
+                ".*robotiq_85_left_knuckle_joint": 0.17,
+                ".*robotiq_85_right_finger_tip_joint": 0.002,
+                ".*robotiq_85_left_finger_tip_joint": 0.002,
+            },
+            damping={
+                ".*joint_[1-7]": 100.0,
+                ".*robotiq_85_left_knuckle_joint": 0.0002,
+                ".*robotiq_85_right_finger_tip_joint": 0.00001,
+                ".*robotiq_85_left_finger_tip_joint": 0.00001,
+            },
+        ),
+    },
+)
+"""Configuration of Kinova Gen3 (7-Dof) arm with no gripper."""
 
 ##
 # Scene definition

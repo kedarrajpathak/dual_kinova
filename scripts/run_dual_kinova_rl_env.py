@@ -8,7 +8,7 @@ This script demonstrates how to run the RL environment for the cartpole balancin
 
 .. code-block:: bash
 
-    ./isaaclab.sh -p scripts/tutorials/03_envs/run_dual_kinova_ik_rl_env.py --task Isaac-Dual-Kinova-IK-v0 --num_envs 1 --enable_cameras -k calibration_matrix.npy -d distortion_coefficients.npy -t DICT_4X4_50 -l 0.053
+    ./isaaclab.sh -p scripts/tutorials/03_envs/run_dual_kinova_rl_env.py --task Isaac-Dual-Kinova-IK-v0 --num_envs 1 --enable_cameras -k calibration_matrix.npy -d distortion_coefficients.npy -t DICT_4X4_50 -l 0.053
 
 """
 
@@ -52,6 +52,10 @@ import isaaclab.utils.math as math_utils
 from isaaclab_tasks.utils import parse_env_cfg
 
 from pose_estimation import pose_esitmation
+from cube_tracking import KalmanFilter3D, ArucoCubeTracking
+
+aruco_cube_tracker = ArucoCubeTracking(calibration_matrix_path="/workspace/isaaclab/scripts/tutorials/03_envs/calibration_matrix.npy",
+                                       distortion_coefficients_path="/workspace/isaaclab/scripts/tutorials/03_envs/distortion_coefficients.npy")
 
 def process_aruco_poses(rvec, tvec, idx):
     quats = []
@@ -81,18 +85,6 @@ def main():
     aruco_dict_type = cv2.aruco.DICT_4X4_50  # Update with the desired ArUco dictionary
     marker_length = 0.053  # Length of the marker's side in meters
 
-    # if ARUCO_DICT.get(args_cli["type"], None) is None:
-    #     print(f"ArUCo tag type '{args_cli['type']}' is not supported")
-    #     sys.exit(0)
-
-    # aruco_dict_type = ARUCO_DICT[args_cli["type"]]
-    # marker_length = args_cli["length"]
-    # calibration_matrix_path = args_cli["K_Matrix"]
-    # distortion_coefficients_path = args_cli["D_Coeff"]
-    
-    # k = np.load(calibration_matrix_path)
-    # d = np.load(distortion_coefficients_path)
-
     # Initialize webcam
     video = cv2.VideoCapture(0)
 
@@ -102,10 +94,6 @@ def main():
     )
     # create environment configuration
     env = gym.make(args_cli.task, cfg=env_cfg).unwrapped
-    # env_cfg = DualKinovaRLEnvCfg()
-    # env_cfg.scene.num_envs = args_cli.num_envs
-    # # setup RL environment
-    # env = ManagerBasedRLEnv(cfg=env_cfg)
 
     left_arm_pose = [0.5, -0.5, 0.5, 0.0, 1.0, 0.0, 0.0] # position:xyz orientation:wxyz
     left_gripper_pose = [1.0]
@@ -121,34 +109,51 @@ def main():
     actions = torch.tensor(actions_list, dtype=torch.float32, device=env.device).repeat(env.num_envs, 1)
     
     print("actions: ", actions)
+    left_cube = ([0.5, -0.5, 0.5], [0.0, 1.0, 0.0, 0.0])
+    right_cube = ([0.5, 0.5, 0.5], [0.0, 1.0, 0.0, 0.0])
             
     # simulate physics
     count = 0
     while simulation_app.is_running():
         with torch.inference_mode():
-            # Capture frame from webcam
-            ret, frame = video.read()
-            if not ret:
-                print("[ERROR]: Unable to capture video frame.")
-                break
+            # # Capture frame from webcam
+            # ret, frame = video.read()
+            # if not ret:
+            #     print("[ERROR]: Unable to capture video frame.")
+            #     break
 
             # reset
-            if count % 300 == 0:
+            if count % 1000 == 0:
                 count = 0
                 env.reset()
                 print("-" * 80)
                 print("[INFO]: Resetting environment...")
                 
-            # Estimate poses of ArUco markers
-            _, rvec, tvec, idx = pose_esitmation(frame, aruco_dict_type, marker_length, k, d)
-            if len(idx) == 2:
-                actions_aruco = process_aruco_poses(rvec, tvec, idx)
-                print(f"actions_aruco: {actions_aruco}")
-                # step the environment
-                obs, rew, terminated, truncated, info = env.step(actions_aruco)
-            else:
-                # step the environment
-                obs, rew, terminated, truncated, info = env.step(actions)
+            # # Estimate poses of ArUco markers
+            # _, rvec, tvec, idx = pose_esitmation(frame, aruco_dict_type, marker_length, k, d)
+            output_frame, left_cube, right_cube = aruco_cube_tracker.process_frame()
+            left_pos, left_quat = left_cube
+            right_pos, right_quat = right_cube
+            # actions_cube = torch.tensor([left_pos[0], left_pos[1], left_pos[2], left_quat[0], left_quat[1], left_quat[2], left_quat[3],
+            #                              0.78, right_pos[0], right_pos[1], right_pos[2], right_quat[0], right_quat[1], right_quat[2], right_quat[3],
+            #                              0.78], dtype=torch.float32, device="cuda:0").unsqueeze(0)
+            cv2.imshow("Output Frame", output_frame)
+            cv2.waitKey(1)
+            actions_cube = torch.tensor([1-left_pos[2], left_pos[0]*3, -left_pos[1]+0.3, 0.0, 1.0, 0.0, 0.0,
+                                         0.78, 1-right_pos[2], right_pos[0]*3, -right_pos[1]+0.3, 0.0, 1.0, 0.0, 0.0,
+                                         0.78], dtype=torch.float32, device="cuda:0").unsqueeze(0)
+            print(f"actions_cube: {actions_cube[0][:3]}, {actions_cube[0][7:10]}")
+            obs, rew, terminated, truncated, info = env.step(actions_cube)
+            
+            # if len(idx) == 2:
+            #     actions_aruco = process_aruco_poses(rvec, tvec, idx)
+            #     print(f"actions_aruco: {actions_aruco}")
+            #     # step the environment
+            #     obs, rew, terminated, truncated, info = env.step(actions_aruco)
+            
+            # else:
+            #     # step the environment
+            #     obs, rew, terminated, truncated, info = env.step(actions)
                 
             count += 1
 
